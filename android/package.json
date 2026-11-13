@@ -1,0 +1,21 @@
+{
+  "name": "restrocontrol-android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RestroControl Android shell (Capacitor 7) loading the live SaaS app",
+  "scripts": {
+    "cap:add": "npx cap add android",
+    "cap:sync": "npx cap sync android",
+    "force:debug-signing": "node scripts/force-debug-signing.mjs",
+    "build:apk": "./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0"
+  }
+}
