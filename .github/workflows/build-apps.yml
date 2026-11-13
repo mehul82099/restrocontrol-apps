@@ -1,0 +1,116 @@
+name: Build RestroControl Apps
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build-android:
+    name: Build Android APK (review)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup JDK 21 (Capacitor 7 requires it)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: cd android && npm install
+
+      - name: Create placeholder webDir (remote server.url is used at runtime)
+        run: cd android && mkdir -p dist && printf '<!doctype html><meta charset="utf-8"><title>RestroControl</title>' > dist/index.html
+
+      - name: Generate Capacitor Android platform (if not committed)
+        run: |
+          cd android
+          if [ ! -d android/app ]; then npx cap add android; fi
+
+      - name: Install custom MainActivity (navigation policy + UPI/intent handling)
+        run: cd android && node scripts/patch-android-webview.mjs
+
+      - name: Apply brand icons and splash screens
+        run: cd android && node scripts/apply-brand-assets.mjs
+
+      - name: Sync Capacitor
+        run: cd android && npx cap sync android
+
+      - name: Force debug signing (review-only APK)
+        run: cd android && node scripts/force-debug-signing.mjs
+
+      - name: Build release APK (debug-signed)
+        run: |
+          cd android/android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: restrocontrol-android-apk
+          path: android/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows installer (NSIS)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: cd windows && npm install
+
+      - name: Decode app icon (stored as base64 text in repo)
+        run: cd windows && node scripts/prepare-icon.mjs
+
+      - name: Build NSIS installer
+        run: cd windows && npx electron-builder --win nsis
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: restrocontrol-windows-installer
+          path: windows/dist/*.exe
+          if-no-files-found: error
+
+  release:
+    name: Attach artifacts to pre-release
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          prerelease: true
+          generate_release_notes: true
+          name: RestroControl ${{ github.ref_name }} (review)
+          draft: false
