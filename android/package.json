@@ -7,7 +7,7 @@
     "cap:add": "npx cap add android",
     "cap:sync": "npx cap sync android",
     "force:debug-signing": "node scripts/force-debug-signing.mjs",
-    "build:apk": "./gradlew assembleRelease"
+    "build:apk": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@capacitor/core": "^7.0.0",
