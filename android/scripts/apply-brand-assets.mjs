@@ -17,11 +17,17 @@ if (!existsSync(RES)) {
   process.exit(2);
 }
 
+let CONVERT = "convert";
 try {
   execSync("convert -version", { stdio: "pipe" });
 } catch {
-  console.error("[brand-assets] ImageMagick `convert` not found. Install ImageMagick first.");
-  process.exit(2);
+  try {
+    execSync("magick -version", { stdio: "pipe" });
+    CONVERT = "magick";
+  } catch {
+    console.error("[brand-assets] ImageMagick not found (tried `convert` and `magick`).");
+    process.exit(2);
+  }
 }
 
 const tmp = join(process.cwd(), ".brand-icon-512.png");
@@ -34,19 +40,19 @@ const LEGACY = { "mipmap-mdpi": 48, "mipmap-hdpi": 72, "mipmap-xhdpi": 96, "mipm
 
 for (const [dir, px] of Object.entries(FG)) {
   mkdirSync(join(RES, dir), { recursive: true });
-  execSync(`convert "${tmp}" -resize ${px}x${px} "${join(RES, dir, "ic_launcher_foreground.png")}"`);
+  execSync(`${CONVERT} "${tmp}" -resize ${px}x${px} "${join(RES, dir, "ic_launcher_foreground.png")}"`);
 }
 for (const [dir, px] of Object.entries(LEGACY)) {
   mkdirSync(join(RES, dir), { recursive: true });
-  execSync(`convert "${tmp}" -background '${BG}' -flatten -resize ${px}x${px} "${join(RES, dir, "ic_launcher.png")}"`);
-  execSync(`convert "${tmp}" -background '${BG}' -flatten -resize ${px}x${px} "${join(RES, dir, "ic_launcher_round.png")}"`);
+  execSync(`${CONVERT} "${tmp}" -background '${BG}' -flatten -resize ${px}x${px} "${join(RES, dir, "ic_launcher.png")}"`);
+  execSync(`${CONVERT} "${tmp}" -background '${BG}' -flatten -resize ${px}x${px} "${join(RES, dir, "ic_launcher_round.png")}"`);
 }
 
 // Splash: mark centered on brand background; CENTER_CROP handles aspect.
 for (const dir of ["drawable", ...["land-mdpi","land-hdpi","land-xhdpi","land-xxhdpi","land-xxxhdpi","port-mdpi","port-hdpi","port-xhdpi","port-xxhdpi","port-xxxhdpi"].map(d => "drawable-" + d)]) {
   const full = join(RES, dir);
   mkdirSync(full, { recursive: true });
-  execSync(`convert "${tmp}" -background '${BG}' -gravity center -extent 1280x1280 "${join(full, "splash.png")}"`);
+  execSync(`${CONVERT} "${tmp}" -background '${BG}' -gravity center -extent 1280x1280 "${join(full, "splash.png")}"`);
 }
 
 // Adaptive-icon background color.
