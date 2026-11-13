@@ -1,0 +1,65 @@
+package com.restrocontrol.app;
+
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebView;
+import android.widget.Toast;
+
+import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
+
+public class MainActivity extends BridgeActivity {
+    private static final String APP_HOST = "restrocontrol.new.tg";
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                String scheme = uri.getScheme() == null ? "" : uri.getScheme();
+                String host = uri.getHost() == null ? "" : uri.getHost();
+
+                // Razorpay UPI / intent payment links: hand to Android so a UPI app
+                // can open them. Only reliable for main-frame navigations; UPI
+                // launches from inside the checkout iframe are a WebView platform
+                // limitation (see android/README.md QA gaps).
+                if ("upi".equals(scheme) || "intent".equals(scheme)) {
+                    try {
+                        Intent i = "intent".equals(scheme)
+                                ? Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME)
+                                : new Intent(Intent.ACTION_VIEW, uri);
+                        startActivity(i);
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this,
+                                "No app on this phone can handle that payment link",
+                                Toast.LENGTH_LONG).show();
+                    }
+                    return true;
+                }
+
+                // Our own site stays inside the WebView.
+                if (APP_HOST.equals(host)) {
+                    // Google sign-in cannot finish inside the app shell: the OAuth
+                    // state cookie is set here, but the callback would land in the
+                    // external browser without it and always fail. Tell the user
+                    // instead of starting a flow that cannot succeed.
+                    String path = uri.getPath() == null ? "" : uri.getPath();
+                    if (path.startsWith("/api/auth/google/start")) {
+                        Toast.makeText(MainActivity.this,
+                                "Google sign-in is not available in the app yet. Please use email and password.",
+                                Toast.LENGTH_LONG).show();
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Anything else: default Capacitor handling (external browser).
+                return super.shouldOverrideUrlLoading(view, request);
+            }
+        });
+    }
+}
